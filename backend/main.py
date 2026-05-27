@@ -440,12 +440,10 @@ def review_queue(
             .all()
         )
 
-        flagged = (
-            db.query(PlagiarismFlag)
-            .filter((PlagiarismFlag.crop_a_id == crop.id) | (PlagiarismFlag.crop_b_id == crop.id))
-            .first()
-            .is not None
-        )
+        flagged_record = db.query(PlagiarismFlag).filter(
+            (PlagiarismFlag.crop_a_id == crop.id) | (PlagiarismFlag.crop_b_id == crop.id)
+        ).first()
+        flagged = flagged_record is not None
 
         items.append(schemas.ReviewQueueItem(
             crop_id=crop.id,
