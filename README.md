@@ -1,80 +1,124 @@
 ---
-title: gradeops
-emoji: 🚀
+title: controlplane-ai
+emoji: 🛡️
 colorFrom: blue
 colorTo: indigo
 sdk: docker
 pinned: false
 ---
 
-# GradeOps 
+# ControlPlane.ai
 
-> **Human-in-the-Loop AI grading pipeline for handwritten exams**
+> **A Responsible AI Checker: a black-box guardrail layer that flags hallucination, privacy leaks, and bias in AI output before it reaches a user.**
 
+Built for the Accenture Innovation Challenge (Round 2). ControlPlane.ai generalizes my Round 1 project, **GradeOps** (a human-in-the-loop grading pipeline), whose critic-and-grounding mechanism was effectively a narrow responsible-AI checker. Round 2 extracts that engine into a general checker that can wrap any AI output, and keeps the exam-grading pipeline as the worked vertical.
 
-[[Live Demo](https://samruddhisadar-gradeops.hf.space)]
-
-STACK - FastAPI, React, Langraph.
+STACK - FastAPI, React, LangGraph, HHEM-2.1-Open.
 DB - SQLite / PostgreSQL
 
 ---
 
-## What is GradeOps?
+## What it does
 
-Grading handwritten exams is slow, inconsistent, and prone to bias. GradeOps solves this by combining **Vision-Language Models** and **Agentic LLMs** into a pipeline that:
+Enterprises run generative AI across many use cases at once (customer chatbots, internal copilots, decision-support tools), each with a different risk tolerance. ControlPlane.ai sits over that output as a checker and:
 
-1. Reads scanned exam PDFs and extracts handwritten answers using AI vision
-2. Grades them automatically against instructor-defined rubrics (with partial credit)
-3. Pushes the AI-proposed grades to a review dashboard where TAs approve or override — keeping humans in the loop
+1. **Detects** hallucination (grounding), privacy leaks (PII), and bias, using deterministic checks first and an LLM judge only when needed.
+2. **Decides** a tier per output — allow / edit / flag / block — driven by a per-use-case policy.
+3. **Logs** every decision to an immutable, version-stamped audit trail.
+
+The grading vertical (GradeOps) is the concrete demo: it reads scanned handwritten exams, redacts student identifiers, grades against a rubric with partial credit, and routes uncertain grades to a human review dashboard.
 
 ---
 
-## Architecture Overview
+## What Round 2 added on top of GradeOps
 
-```
-React 18 + Vite + Tailwind (Frontend)
-        │
-        ▼
-FastAPI (Backend — also serves frontend in production)
-        │
-   ┌────┴──────────────────────────────────────┐
-   ▼          ▼             ▼           ▼       ▼
-Ingestion   OCR         Agentic      Plagiarism  Audit
-(PyMuPDF)  (Gemini      Grader       (sentence-  (versioned
-            Vision via  (Langgraph   transformers decision log)
-            Langchain)  4-node)      cosine)
-                │
-                ▼
-        SQLAlchemy → SQLite (dev) / PostgreSQL (prod)
+| Area | GradeOps (Round 1) | ControlPlane.ai (Round 2) |
+|------|--------------------|---------------------------|
+| Determinism | temperature unset (stochastic) | explicit **temp 0**, reproducible |
+| Grounding | LLM critic only | **HHEM-2.1-Open** faithfulness score + deterministic citation verifier + cross-model critic |
+| Decisions | pass/fail | **tiered** allow / edit / flag / block |
+| Policy | one rubric | **JSON policy layer**, 3 use-case configs |
+| Scope | exam grader | **general checker** via `POST /api/check` |
+| Privacy | fixed top-strip mask (missed angled photos) | **vision-based PII detection + redaction** anywhere on the page |
+| Confidence | multi-pass variance | composite **uncertainty** (HHEM + rules + critic + flags) |
+| Cost | 2 vision calls/crop, frequent rate-limit breaks | 1 vision call/crop, free CPU grounding, throttled |
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+    IN["Input: exam answer<br/>or any AI output + context"] --> EX["Extractor<br/>vision · Gemini · temp 0"]
+    EX --> SC["Scorer / responder<br/>text · model A · temp 0"]
+    SC --> JU["Justifier<br/>text · model A · temp 0"]
+    JU --> VER["Verifier node<br/>DETERMINISTIC · no API"]
+
+    VER --> RULE["Citation rule check<br/>cited claims exist, award &lt;= max"]
+    VER --> HHEM["HHEM-2.1-Open<br/>faithfulness score 0..1"]
+
+    RULE --> GATE{"Gate"}
+    HHEM --> GATE
+    GATE -->|"hard rule fail"| DEC
+    GATE -->|"clean + grounding high"| DEC
+    GATE -->|"borderline / low / warn"| CRIT["LLM Critic<br/>model B · cross-model · CoVe-style"]
+    CRIT --> DEC
+
+    subgraph PLANNED["Pillar checks"]
+      PII["Privacy<br/>Presidio / LLM Guard PII"]
+      BIAS["Bias<br/>LLM Guard + similarity"]
+    end
+    JU -.-> PII
+    JU -.-> BIAS
+    PII -.-> DEC
+    BIAS -.-> DEC
+
+    DEC["Decision engine<br/>allow / edit / flag / block"]
+    POL[("Policy layer · JSON<br/>3 use-case configs")] -.-> DEC
+    DEC --> AUD["Audit log<br/>version-stamped · immutable"]
+    DEC --> Q["Review queue<br/>sorted by composite uncertainty"]
+    Q --> FB["Overrides tune thresholds"]
+    FB -.-> DEC
+
+    classDef det fill:#e8f4ea,stroke:#3a7d44,color:#123;
+    classDef llm fill:#eef2fb,stroke:#3b5bdb,color:#123;
+    classDef gov fill:#fdf3e7,stroke:#c47f17,color:#123;
+    class RULE,HHEM,VER det;
+    class EX,SC,JU,CRIT llm;
+    class DEC,AUD,Q,FB,POL gov;
 ```
 
-### The 4-Node Langgraph Grading Pipeline
+Green nodes are deterministic (CPU, no API), blue are LLM calls, orange is the governance layer. The gate runs the cheap deterministic checks first and only invokes the LLM critic on borderline cases, which protects both latency and free-tier quota.
 
-```
-Extractor → Scorer → Justifier → Critic
-                         ↑____________| (retry loop if points aren't traceable to claims)
-```
+---
 
-| Node | What it does |
-|------|-------------|
-| **Extractor** | Reads OCR transcript, pulls out answer claims |
-| **Scorer** | Awards partial credit per rubric criterion |
-| **Justifier** | Writes a 2–3 sentence rationale citing specific claims |
-| **Critic** | Self-audits: every point must be traceable back to a claim |
+## The grading vertical (GradeOps pipeline)
+
+The exam-grading path is the concrete, end-to-end demonstration of the checker.
+
+```mermaid
+flowchart LR
+    PDF["Scanned PDF /<br/>photo"] --> SPLIT["Split pages<br/>PyMuPDF"]
+    SPLIT --> CROP["Detect + crop<br/>answer region"]
+    CROP --> ANON["Redact PII<br/>vision detection"]
+    ANON --> GRADE["Grade<br/>(cascade above)"]
+    GRADE --> AGG["Aggregate<br/>+ uncertainty"]
+    AGG --> PLAG["Plagiarism<br/>cosine similarity"]
+    AGG --> REVIEW["Review queue<br/>+ audit log"]
+```
 
 ---
 
 ## Features
 
-- **Bulk PDF Upload** : Professors upload entire exam batches at once
-- **Rubric Builder** : Define criteria with conditions, alternatives, and do-not-deduct rules
-- **AI Grading** : Partial credit with structured justifications per question
-- **Plagiarism Detection** : Cosine similarity over OCR transcripts using sentence-transformers
-- **Review Dashboard** : Side-by-side view of student answer + AI grade with keyboard shortcuts (`Enter / O / F / J / K`)
-- **Sorted by Uncertainty** : High-variance AI grades surface first for TA review
-- **Audit Log** : Every decision stamped with rubric version, prompt version, and model version
-- **Anonymization** : Top strip of each answer crop is masked before any external API call
-- **RBAC** : Instructor and TA roles tracked in DB with reviewer attribution
+- **General checker API** : `POST /api/check` runs grounding + PII + bias over any output and returns a tiered decision under a chosen policy.
+- **Grounding (hallucination)** : HHEM-2.1-Open faithfulness scoring on CPU (no API), plus a deterministic verifier that every awarded point cites a real claim.
+- **Privacy** : vision-based detection and redaction of name / roll / date / email anywhere on a page, before any external call.
+- **Bias** : output-side bias scanning plus similarity-as-fairness (near-identical answers scored differently get flagged).
+- **Tiered decisions + policy layer** : three use-case configs (customer support, internal knowledge, decision support) with different risk tolerances.
+- **Deterministic + auditable** : temperature 0, reproducible, every decision stamped with rubric / prompt / model versions.
+- **Review dashboard** : side-by-side answer + AI grade, sorted by uncertainty, keyboard shortcuts (`Enter / O / F / J / K`).
+- **Plagiarism** : cosine similarity over transcripts using sentence-transformers.
 
 ---
 
@@ -84,9 +128,10 @@ Extractor → Scorer → Justifier → Critic
 |-------|-----------|
 | Frontend | React 18, Vite, Tailwind CSS |
 | Backend | FastAPI, Python |
-| Agentic AI | Langgraph, Langchain |
-| LLM (default) | Gemini 2.5 Flash Lite (provider-agnostic — swap to Claude with one env var) |
-| OCR | Gemini Vision (hosted) / Qwen-VL (GPU, HuggingFace) |
+| Agentic AI | LangGraph, LangChain |
+| LLM (default) | Gemini 2.5 Flash Lite (per-role routing; swap text/critic to Groq or Claude via env) |
+| Grounding | HHEM-2.1-Open (Vectara), CPU |
+| OCR / vision | Gemini Vision (hosted) / Qwen-VL (GPU) |
 | Plagiarism | `sentence-transformers/all-MiniLM-L6-v2` |
 | PDF Ingestion | PyMuPDF |
 | Database | SQLAlchemy + SQLite (dev) / PostgreSQL (prod) |
@@ -99,30 +144,33 @@ Extractor → Scorer → Justifier → Critic
 ```bash
 # 1. Clone and set up
 git clone <your-repo-url>
-cd gradeops
+cd controlplane-ai
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 # 2. Configure
 cp .env.example .env
-# Open .env and set GOOGLE_API_KEY at minimum
+# set GOOGLE_API_KEY at minimum.
+# For an all-Gemini setup (no Groq key), also set:
+#   TEXT_PROVIDER=google
+#   CRITIC_PROVIDER=google
 
-# 3. Initialize database and seed demo data
-python scripts/init_db.py
-python scripts/seed_demo.py
-
-# 4. Run backend
+# 3. Run (backend also serves the built frontend in production)
 uvicorn backend.main:app --reload --port 8000
+# open http://localhost:8000
 
-# 5. Run frontend (separate terminal)
+# 4. Frontend dev server (optional, separate terminal)
 cd frontend && npm install && npm run dev
+```
 
-# CLI demo (no UI needed)
-python scripts/run_demo.py path/to/answer.jpg
+Try the general checker:
 
-# Diagnose environment / LLM chain issues
-python debug_llm.py
+```bash
+curl -X POST http://localhost:8000/api/check \
+  -H "Content-Type: application/json" \
+  -d '{"use_case":"decision_support","output":"The capital of France is Berlin.","context":"Its capital is Paris."}'
+# -> tier: block, grounding risk high
 ```
 
 ---
@@ -133,10 +181,25 @@ python debug_llm.py
 LLM_PROVIDER=google
 GOOGLE_API_KEY=AIzaSy...
 GRADER_MODEL_GOOGLE=gemini-2.5-flash-lite
-GRADER_NUM_PASSES=1          # Bump to 5 on paid tier
-GRADER_CRITIC_RETRY=0        # Set to 1 to enable self-audit retry
-LLM_MIN_GAP_SECONDS=4.5      # Set 0 for paid tiers
-OCR_BACKEND=hosted            # 'qwen_vl' for GPU production
+
+# Per-role routing. Vision must be a vision-capable provider (google/anthropic).
+# Text and critic can go to Groq (fast, free) or stay on google.
+TEXT_PROVIDER=google
+CRITIC_PROVIDER=google
+GROQ_API_KEY=
+
+# Determinism (Lane A): temp 0, single pass.
+GRADER_TEMPERATURE=0.0
+GRADER_NUM_PASSES=1
+GRADER_CRITIC_RETRY=0
+LLM_MIN_GAP_SECONDS=4.5
+
+# Grounding (HHEM-2.1-Open; CPU, no API).
+HHEM_ENABLED=true
+HHEM_HIGH_THRESHOLD=0.7
+HHEM_LOW_THRESHOLD=0.4
+
+OCR_BACKEND=hosted
 DATABASE_URL=sqlite:///./gradeops.db
 STORAGE_ROOT=./storage
 PLAGIARISM_THRESHOLD=0.82
@@ -148,23 +211,29 @@ EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ## Project Structure
 
 ```
-gradeops/
+controlplane-ai/
 ├── backend/
-│   ├── main.py               FastAPI app
+│   ├── main.py               FastAPI app (also serves frontend in prod)
+│   ├── checker.py            General "check any output" entrypoint
+│   ├── checker_api.py        /api/check + /api/policies routes
+│   ├── confidence.py         Composite review-queue uncertainty
+│   ├── fairness.py           Similarity-as-fairness flags
+│   ├── checks/               grounding / PII / bias checks
+│   ├── policy/               3 use-case policy configs + loader
+│   ├── decision/             Tiered decision engine
 │   ├── grader/
-│   │   ├── graph.py          Langgraph state machine
-│   │   ├── nodes.py          4 agent nodes
-│   │   ├── llm.py            Provider-agnostic LLM factory
+│   │   ├── graph.py          LangGraph cascade
+│   │   ├── nodes.py          Extractor / Scorer / Justifier / Critic
+│   │   ├── cascade.py        Deterministic verifier node + gate
+│   │   ├── grounding.py      HHEM faithfulness scoring
+│   │   ├── rules.py          Deterministic citation verifier
+│   │   ├── llm.py            Per-role LLM factory
 │   │   └── rate_limit.py     Global throttle (free-tier safe)
-│   ├── ingestion/            PDF splitting, cropping, anonymization
+│   ├── ingestion/            PDF split, crop, vision-based PII redaction
 │   └── ocr/                  Hosted vision + Qwen-VL adapters
 ├── frontend/
-│   └── src/pages/
-│       ├── Rubrics.jsx       Rubric CRUD editor
-│       ├── Grading.jsx       Batch upload + progress
-│       ├── Review.jsx        Side-by-side TA dashboard
-│       └── Audit.jsx         Stats + decision log
-└── scripts/                  DB init, demo seeder, CLI runner
+│   └── src/pages/            Rubrics / Grading / Review / Audit
+└── scripts/                  eval harness, eval-set generator, pregrade
 ```
 
 ---
@@ -173,24 +242,36 @@ gradeops/
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /health` | Provider + model + OCR backend status |
-| `GET /debug/env` | What `.env` actually loaded |
+| `POST /api/check` | Run the checker over any AI output; returns a tiered decision |
+| `GET /api/policies` | List the use-case policies |
+| `GET /api/health` | Provider + per-role model + OCR backend status |
+| `POST /api/papers/upload` | Grade an exam paper (the vertical demo) |
+| `GET /api/review/queue` | Review queue, sorted by uncertainty |
+| `GET /api/audit` | Immutable decision log |
+| `GET /api/stats` | Dashboard metrics |
 | `GET /docs` | Full Swagger UI |
-| `POST /papers/upload` | Bulk PDF upload |
+
+---
+
+## Evaluation
+
+The checker's false-positive / negative rate is measured deterministically via error injection (no API calls):
+
+```bash
+python scripts/make_eval_set.py --out data/eval/set.jsonl --n 40
+python scripts/eval.py --set data/eval/set.jsonl --out data/eval
+```
+
+This corrupts known-correct grades (unsupported award, fabricated citation, inflated award) and reports the checker's precision / recall / F1 and a per-injection catch rate.
 
 ---
 
 ## Deployment (Hugging Face Spaces)
 
-
-**Live at:** https://samruddhisadar-gradeops.hf.space  
-*(Sleeps after 48h inactivity — ~30s cold start on first request)*
-
-
-
-
-
+Docker SDK Space. Set `GOOGLE_API_KEY` (and the routing vars above) as Space secrets. For demo reliability, pre-grade the demo set and bake the resulting `gradeops.db` into the image so the live demo needs no LLM call.
 
 ---
 
+## Lineage
 
+ControlPlane.ai is the Round 2 evolution of GradeOps (`github.com/samsadar236/gradeops`). The commit history of this repository includes the full GradeOps lineage followed by the ControlPlane generalization, so the progression is on the record.
