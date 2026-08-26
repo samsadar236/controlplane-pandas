@@ -1,0 +1,19 @@
+{
+  "name": "internal_knowledge",
+  "description": "Internal knowledge assistant for employees. Lower stakes and higher tolerance; redacts PII rather than blocking, rarely blocks outright.",
+  "latency_budget_ms": 1500,
+  "checks": {
+    "grounding": {
+      "enabled": true,
+      "actions": {"high": "flag", "medium": "allow", "low": "allow", "unknown": "allow"}
+    },
+    "pii": {
+      "enabled": true,
+      "actions": {"high": "edit", "medium": "allow", "low": "allow", "unknown": "allow"}
+    },
+    "bias": {
+      "enabled": true,
+      "actions": {"high": "flag", "medium": "allow", "low": "allow", "unknown": "allow"}
+    }
+  }
+}

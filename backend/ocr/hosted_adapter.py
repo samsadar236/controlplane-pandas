@@ -1,9 +1,9 @@
 """Hosted vision-API OCR adapter — passes through the shared LLM factory.
 
-Uses whichever LLM is configured in settings.llm_provider (Gemini by
-default — free tier — or Claude). Runs on any laptop with no GPU.
-Throttled through the shared rate limiter so OCR calls cannot blow past
-the per-minute quota when followed by grading calls.
+Uses the 'vision' role from the per-role LLM factory (Gemini by default —
+free tier — or another vision-capable provider). Runs on any laptop with
+no GPU. Throttled through the shared rate limiter so OCR calls cannot blow
+past the per-minute quota when followed by grading calls.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ TRANSCRIBE_PROMPT = (
 
 
 def transcribe(image_path: str) -> str:
-    """Transcribe handwritten content via the configured chat model."""
+    """Transcribe handwritten content via the configured vision model."""
     wait_turn()
     img_bytes = Path(image_path).read_bytes()
     img_b64 = base64.b64encode(img_bytes).decode("ascii")
@@ -35,7 +35,7 @@ def transcribe(image_path: str) -> str:
     media_type = "image/jpeg" if suffix in ("jpg", "jpeg") else f"image/{suffix or 'jpeg'}"
     data_url = f"data:{media_type};base64,{img_b64}"
 
-    llm = get_llm()
+    llm = get_llm("vision")
     msg = HumanMessage(content=[
         {"type": "image_url", "image_url": {"url": data_url}},
         {"type": "text", "text": TRANSCRIBE_PROMPT},

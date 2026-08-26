@@ -139,6 +139,7 @@ class GradingAggregate(Base):
     min_score = Column(Float, nullable=False)
     std_dev = Column(Float, nullable=False)
     n_passes = Column(Integer, nullable=False)
+    uncertainty = Column(Float, nullable=False, default=0.0)
     computed_at = Column(DateTime, default=datetime.utcnow)
 
 

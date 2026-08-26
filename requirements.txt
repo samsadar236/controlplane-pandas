@@ -22,15 +22,19 @@ anthropic>=0.40
 langchain>=0.3
 langchain-anthropic>=0.2
 langchain-google-genai>=2.0
+langchain-groq>=0.2
 google-generativeai>=0.8
 langgraph>=0.2
 
-# --- Plagiarism / embeddings ---
-sentence-transformers>=2.5
+# --- Grounding (HHEM) + embeddings / plagiarism ---
+# HHEM-2.1-Open needs transformers 4.x; 5.x breaks its custom model code.
+# sentence-transformers pinned <6 so it does not pull transformers 5.x back in.
+transformers>=4.40,<5
+huggingface-hub>=0.30,<1
+torch>=2.2
+sentence-transformers>=2.5,<6
 scikit-learn>=1.4
 
 # --- Optional: Qwen-VL via HuggingFace (requires GPU) ---
 # Uncomment to enable the qwen_vl adapter. Demo runs without these.
-# transformers>=4.45
-# torch>=2.2
 # accelerate>=0.30

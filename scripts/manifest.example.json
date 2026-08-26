@@ -1,0 +1,21 @@
+{
+  "session_id": "public",
+  "exam_title": "Demo Midterm",
+  "rubrics": [
+    {
+      "title": "Q1 Antiderivative",
+      "question_text": "Find the antiderivative F(x) of f(x)=2x and evaluate F(2)-F(0).",
+      "max_marks": 3.0,
+      "course_instructions": "Award partial credit per criterion. Do not deduct for missing +C once evaluated.",
+      "criteria": [
+        {"name": "Antiderivative", "points": 1.0, "conditions": "F(x)=x^2 (+C)", "accept_alternatives": "", "do_not_deduct_for": "missing +C"},
+        {"name": "Evaluation", "points": 1.0, "conditions": "F(2)-F(0)=4", "accept_alternatives": "", "do_not_deduct_for": ""},
+        {"name": "Constant handled", "points": 1.0, "conditions": "constant cancels or noted", "accept_alternatives": "", "do_not_deduct_for": ""}
+      ]
+    }
+  ],
+  "papers": [
+    {"file": "data/demo/paper1.pdf", "rubric_index": 0, "student_anon_id": "STU-001"},
+    {"file": "data/demo/paper2.pdf", "rubric_index": 0, "student_anon_id": "STU-002"}
+  ]
+}

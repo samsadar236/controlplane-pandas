@@ -1,0 +1,19 @@
+{
+  "name": "decision_support",
+  "description": "High-stakes decision-support tool. Ungroundedness is the top risk; flags even mild grounding gaps and blocks strong ones. Strict on PII and bias too.",
+  "latency_budget_ms": 3000,
+  "checks": {
+    "grounding": {
+      "enabled": true,
+      "actions": {"high": "block", "medium": "flag", "low": "allow", "unknown": "flag"}
+    },
+    "pii": {
+      "enabled": true,
+      "actions": {"high": "block", "medium": "edit", "low": "allow", "unknown": "flag"}
+    },
+    "bias": {
+      "enabled": true,
+      "actions": {"high": "block", "medium": "flag", "low": "allow", "unknown": "flag"}
+    }
+  }
+}

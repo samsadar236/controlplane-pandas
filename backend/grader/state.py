@@ -26,7 +26,14 @@ class GradingState(TypedDict, total=False):
     justification: str
     flags: list[str]
 
-    # Set by Critic
+    # Set by Verifier (deterministic cascade gate: rules + HHEM grounding)
+    rule_result: dict
+    rule_summary: str
+    grounding_score: Optional[float]
+    grounding_band: str
+    deterministic_passed: bool
+
+    # Set by Critic (LLM; only runs on borderline cases)
     critic_passed: bool
     critic_feedback: str
 

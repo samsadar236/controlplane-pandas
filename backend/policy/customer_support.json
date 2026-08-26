@@ -1,0 +1,19 @@
+{
+  "name": "customer_support",
+  "description": "External-facing assistant. PII leakage is the top risk; tolerant of mild ungroundedness but blocks blatant hallucination.",
+  "latency_budget_ms": 800,
+  "checks": {
+    "grounding": {
+      "enabled": true,
+      "actions": {"high": "block", "medium": "allow", "low": "allow", "unknown": "flag"}
+    },
+    "pii": {
+      "enabled": true,
+      "actions": {"high": "block", "medium": "edit", "low": "allow", "unknown": "flag"}
+    },
+    "bias": {
+      "enabled": true,
+      "actions": {"high": "flag", "medium": "flag", "low": "allow", "unknown": "allow"}
+    }
+  }
+}

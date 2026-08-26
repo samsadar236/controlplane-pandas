@@ -100,6 +100,7 @@ class AggregateOut(BaseModel):
     min_score: float
     std_dev: float
     n_passes: int
+    uncertainty: float = 0.0   # T1.4: composite review-queue sort key (higher = review first)
     model_config = ConfigDict(from_attributes=True)
 
 

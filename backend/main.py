@@ -6,7 +6,7 @@ Routes (now namespaced under /api):
   /api/rubrics      CRUD rubrics (immutable; updates create new versions)
   /api/papers       upload PDFs, kick off the full pipeline
   /api/crops        list crops + image bytes
-  /api/review       review queue (sorted by std-dev DESC) + decision endpoint
+  /api/review       review queue (sorted by uncertainty DESC) + decision endpoint
   /api/audit        immutable audit log
   /api/plagiarism   pair list above threshold
   /api/stats        override-rate dashboard metrics
@@ -15,8 +15,8 @@ Routes (now namespaced under /api):
 
 Pipeline (kicked off on POST /api/papers/upload):
   PDF split → answer-region crop → anonymize →
-    OCR transcribe → agentic grader 5x in parallel →
-    aggregate → plagiarism worker over this exam
+    extractor transcribe → deterministic cascade (rules + HHEM) →
+    LLM critic on borderline → aggregate → plagiarism worker over this exam
 """
 from __future__ import annotations
 
@@ -42,10 +42,13 @@ from .audit import log_event
 from .ingestion import split_pdf_to_pages, detect_answer_regions, crop_region, anonymize_crop
 from .ocr import transcribe as ocr_transcribe
 from .grader import grade_multi_pass, aggregate_scores
+from .confidence import aggregate_passes
 from .plagiarism import find_similar_pairs
 
 
 app = FastAPI(title="GRADEOPS", version="0.1.0")
+from .checker_api import router as checker_router
+app.include_router(checker_router)
 
 # Open CORS for the React dev server (Vite defaults to 5173).
 app.add_middleware(
@@ -278,19 +281,15 @@ def upload_papers(
             db.commit()
             db.refresh(crop)
 
-            # 6. OCR transcribe (canonical transcript for plagiarism + search)
-            try:
-                transcript = ocr_transcribe(anon)
-            except Exception as e:
-                transcript = f"[OCR error: {e}]"
-
-            # 7. Run the agentic grader NUM_PASSES times in parallel
+            # 6+7. Grade. The Extractor already transcribes, so there is no
+            # separate OCR vision call (one vision call per crop, not two).
             passes = grade_multi_pass(
                 anon,
                 question=rubric.question_text,
                 max_marks=rubric.max_marks,
                 criteria=rubric.criteria,
             )
+            transcript = (passes[0].get("transcript") if passes else "") or ""
 
             # 8. Persist gradings + aggregate
             for i, p in enumerate(passes, 1):
@@ -311,7 +310,7 @@ def upload_papers(
                 )
                 db.add(g)
 
-            agg = aggregate_scores(passes)
+            agg = aggregate_passes(passes)
             db.add(GradingAggregate(
                 crop_id=crop.id,
                 median=agg["median"],
@@ -319,9 +318,11 @@ def upload_papers(
                 min_score=agg["min_score"],
                 std_dev=agg["std_dev"],
                 n_passes=agg["n_passes"],
+                uncertainty=agg["uncertainty"],
             ))
             log_event(db, "grading", crop.id, "create",
-                      after={"median": agg["median"], "std_dev": agg["std_dev"]},
+                      after={"median": agg["median"], "std_dev": agg["std_dev"],
+                             "uncertainty": agg["uncertainty"]},
                       rubric_version=rubric.version)
             db.commit()
             crop_records.append(crop)
@@ -412,7 +413,7 @@ def review_queue(
     only_pending: bool = True,
     db: Session = Depends(get_db),
 ):
-    """Return crops sorted by std-dev DESC (highest uncertainty first)."""
+    """Return crops sorted by uncertainty DESC (highest uncertainty first)."""
     q = (
         db.query(Crop, GradingAggregate, Paper, Rubric)
         .join(GradingAggregate, GradingAggregate.crop_id == Crop.id)
@@ -423,7 +424,7 @@ def review_queue(
         q = q.filter(Paper.exam_id == exam_id)
 
     items: list[schemas.ReviewQueueItem] = []
-    for crop, agg, paper, rubric in q.order_by(GradingAggregate.std_dev.desc()).all():
+    for crop, agg, paper, rubric in q.order_by(GradingAggregate.uncertainty.desc()).all():
         latest_review = (
             db.query(Review)
             .filter(Review.crop_id == crop.id)
@@ -460,6 +461,7 @@ def review_queue(
                 min_score=agg.min_score,
                 std_dev=agg.std_dev,
                 n_passes=agg.n_passes,
+                uncertainty=agg.uncertainty,
             ),
             gradings=[schemas.GradingOut.model_validate(g) for g in gradings],
             plagiarism_flagged=flagged,
@@ -524,7 +526,7 @@ def get_stats(db: Session = Depends(get_db)):
     total_reviewed = db.query(Review).count()
     overrides = db.query(Review).filter(Review.action == "override").count()
     flags = db.query(Review).filter(Review.action == "flag").count()
-    mean_std = db.query(func.avg(GradingAggregate.std_dev)).scalar() or 0.0
+    mean_unc = db.query(func.avg(GradingAggregate.uncertainty)).scalar() or 0.0
 
     override_rows = db.query(Review).filter(Review.action == "override").all()
     deltas = [abs(r.final_score - r.ai_score) for r in override_rows]
@@ -535,7 +537,7 @@ def get_stats(db: Session = Depends(get_db)):
         "total_reviewed": total_reviewed,
         "override_rate": overrides / total_reviewed if total_reviewed else 0.0,
         "flag_rate": flags / total_reviewed if total_reviewed else 0.0,
-        "mean_std_dev": float(mean_std),
+        "mean_std_dev": float(mean_unc),
         "mean_override_delta": float(mean_delta),
         "plagiarism_pairs": db.query(PlagiarismFlag).count(),
     }
