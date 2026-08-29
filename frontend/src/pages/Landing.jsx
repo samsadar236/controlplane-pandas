@@ -24,6 +24,7 @@ export default function Landing() {
           </div>
           <span className="font-headline-sm text-headline-sm font-bold text-primary">GradeOps</span>
         </div>
+        <span className="text-sm text-on-surface-variant font-bold">ControlPlane.ai · Team Pandas</span>
       </nav>
 
       <div className="md:hidden flex justify-between items-center p-4 bg-surface/90 backdrop-blur-md sticky top-0 z-50 border-b border-outline-variant/30">
