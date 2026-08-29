@@ -63,7 +63,12 @@ export default function Navbar() {
           >
             {users.map(u => (
               <option key={u.id} value={u.id}>
-                {u.role === 'instructor' ? 'Instructor' : 'TA'} · {u.name}
+                {(() => {
+                  const roleLabel = u.role === 'instructor' ? 'Instructor' : 'TA'
+                  return u.name && u.name.toLowerCase() !== roleLabel.toLowerCase()
+                    ? `${roleLabel} · ${u.name}`
+                    : roleLabel
+                })()}
               </option>
             ))}
           </select>

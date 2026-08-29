@@ -11,7 +11,6 @@ export default function Layout() {
       </main>
       <footer className="w-full max-w-6xl mx-auto mt-20 pt-6 border-t border-gray-200 flex justify-between items-center text-sm text-gray-500">
         <span>GradeOps</span>
-        <span>v0.1.0</span>
       </footer>
     </div>
   )
