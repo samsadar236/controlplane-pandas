@@ -37,12 +37,12 @@ export default function Landing() {
         <Menu className="w-6 h-6 text-on-surface" />
       </div>
 
-      <main className="relative z-10 w-full pt-16 md:pt-24 pb-32">
+      <main className="relative z-10 w-full pt-8 md:pt-12 pb-16">
         <section className="max-w-container-max-width mx-auto px-4 md:px-10 flex flex-col items-center text-center">
-          <h1 className={`font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-6 max-w-4xl mt-8 transition-all duration-700 ${loaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <h1 className={`font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-6 max-w-4xl mt-4 transition-all duration-700 ${loaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             Grade smarter, not harder.
           </h1>
-          <p className={`font-body-lg text-body-lg text-on-surface-variant max-w-2xl mb-12 transition-all duration-700 delay-100 ${loaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <p className={`font-body-lg text-body-lg text-on-surface-variant max-w-2xl mb-10 transition-all duration-700 delay-100 ${loaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             Elevate your grading process with AI-powered accuracy and unparalleled speed. Designed
             exclusively for educators to reclaim time without compromising on rigorous academic
             standards.
@@ -58,8 +58,8 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="max-w-container-max-width mx-auto px-4 md:px-10 mt-32">
-          <div className="text-center mb-16">
+        <section className="max-w-container-max-width mx-auto px-4 md:px-10 mt-16">
+          <div className="text-center mb-12">
             <h2 className="font-headline-md text-headline-md text-on-surface mb-4">
               The Complete Grading Architecture
             </h2>
