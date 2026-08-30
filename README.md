@@ -9,6 +9,9 @@ Built for the Accenture Innovation Challenge (Round 2). ControlPlane.ai generali
 STACK - FastAPI, React, LangGraph, HHEM-2.1-Open.
 DB - SQLite / PostgreSQL
 
+Live demo: samruddhisadar-gradeops.hf.space 
+Team Pandas · Accenture Innovation Challenge 2026 · Round 2
+
 ---
 
 ## What it does
