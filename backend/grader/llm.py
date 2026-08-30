@@ -12,8 +12,8 @@ settings.model_for(role). Flipping a *_provider or *_model value in .env
 swaps that role's backend with no code change. Temperature is applied
 uniformly from settings.grader_temperature (Lane A: 0.0 = deterministic).
 
-Instances are cached per role. reset_llm() clears the cache (tests use it
-after changing settings).
+Instances are cached per role+provider+model. reset_llm() clears the cache
+(tests use it after changing settings).
 
 Key resolution is belt-and-braces: settings field first, then os.environ,
 so a manually-set shell variable works even if pydantic-settings missed
@@ -77,8 +77,6 @@ def _build_groq(model: str, temperature: float) -> BaseChatModel:
             "Get a free key at https://console.groq.com/keys and set GROQ_API_KEY "
             "in your .env, or set text_provider/critic_provider to 'google'."
         )
-    # Some langchain-groq versions read the key only from the env var; set it
-    # too so the key is picked up regardless of the constructor arg name.
     os.environ.setdefault("GROQ_API_KEY", key)
     return ChatGroq(
         model=model,
@@ -111,9 +109,12 @@ def get_llm(role: str = "text") -> BaseChatModel:
     """Construct (and cache) the chat model for a given role.
 
     role: 'vision' | 'text' | 'critic'. Defaults to 'text'.
+    Cache key includes provider+model so a secret change + restart always
+    picks up the new provider correctly.
     """
     role = (role or "text").lower()
-    cached = _llm_cache.get(role)
+    cache_key = f"{role}:{settings.provider_for(role)}:{settings.model_for(role)}"
+    cached = _llm_cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -133,7 +134,7 @@ def get_llm(role: str = "text") -> BaseChatModel:
             "Use 'google', 'groq', or 'anthropic'."
         )
 
-    _llm_cache[role] = llm
+    _llm_cache[cache_key] = llm
     return llm
 
 

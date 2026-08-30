@@ -48,8 +48,8 @@ class Settings(BaseSettings):
     # provider (google or anthropic). 'text' handles Scorer + Justifier.
     # 'critic' is separate so it can run cross-model (item 2 / T1.3).
     vision_provider: str = "google"   # Extractor + OCR
-    text_provider: str = "groq"       # Scorer + Justifier (model A)
-    critic_provider: str = "groq"     # Critic (model B)
+    text_provider: str = "google"       # Scorer + Justifier (model A)
+    critic_provider: str = "google"     # Critic (model B)
 
     # --- Google Gemini (vision) ---------------------------------------
     # 2.5-flash-lite has the highest free-tier quota of any vision-capable
