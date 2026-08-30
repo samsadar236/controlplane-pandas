@@ -10,7 +10,7 @@ STACK - FastAPI, React, LangGraph, HHEM-2.1-Open.
 DB - SQLite / PostgreSQL
 
 [Live Demo](https://samruddhisadar-gradeops.hf.space/)
-Team Pandas · Accenture Innovation Challenge 2026 · Round 2
+built by Team Pandas · Accenture Innovation Challenge 2026 · Round 2
 
 ---
 
