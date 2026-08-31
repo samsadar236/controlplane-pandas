@@ -1,9 +1,9 @@
-"""Centralized configuration loaded from environment variables.
+﻿"""Centralized configuration loaded from environment variables.
 
 Loading order (first non-empty wins):
   1. Shell environment variable (e.g. `$env:GOOGLE_API_KEY=...`)
   2. Values in `gradeops/.env` (loaded via python-dotenv from an ABSOLUTE
-     path resolved from this file's location — robust to whatever CWD
+     path resolved from this file's location â€” robust to whatever CWD
      uvicorn was launched with)
   3. Class-level defaults below
 
@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# backend/config.py → ../ → gradeops/ → .env  (absolute path, CWD-independent)
+# backend/config.py â†’ ../ â†’ gradeops/ â†’ .env  (absolute path, CWD-independent)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _ENV_FILE = _PROJECT_ROOT / ".env"
 
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     grader_temperature: float = 0.0
 
     # --- Per-role provider routing (Lane A provider split) ------------
-    # 'vision' handles the Extractor and OCR — it MUST be a vision-capable
+    # 'vision' handles the Extractor and OCR â€” it MUST be a vision-capable
     # provider (google or anthropic). 'text' handles Scorer + Justifier.
     # 'critic' is separate so it can run cross-model (item 2 / T1.3).
     vision_provider: str = "google"   # Extractor + OCR
@@ -53,15 +53,15 @@ class Settings(BaseSettings):
 
     # --- Google Gemini (vision) ---------------------------------------
     # 2.5-flash-lite has the highest free-tier quota of any vision-capable
-    # Gemini (about 15 RPM / 1000 RPD) — picked for reliability over peak
+    # Gemini (about 15 RPM / 1000 RPD) â€” picked for reliability over peak
     # quality. Verify current limits at ai.google.dev/gemini-api/docs/rate-limits.
     google_api_key: str = ""
-    grader_model_google: str = "gemini-2.5-flash-lite"
+    grader_model_google: str = "gemini-3.5-flash-lite"
 
     # --- Groq (free, fast; text + critic roles) -----------------------
     # Groq's free tier is far more generous per-minute than Gemini's and
     # returns in well under a second. Confirm current model ids at
-    # console.groq.com/docs/models — they change.
+    # console.groq.com/docs/models â€” they change.
     #
     # Cross-model critic (item 2): keep critic_model_groq DIFFERENT from
     # grader_model_groq to stop the judge from favouring its own outputs.
@@ -95,7 +95,7 @@ class Settings(BaseSettings):
     # identical, so multi-pass variance is not a useful confidence signal
     # here (confidence comes from HHEM + rule check + critic + flags).
     grader_num_passes: int = 1
-    grader_critic_retry: int = 0          # set to 1 to enable critic→scorer retry
+    grader_critic_retry: int = 0          # set to 1 to enable criticâ†’scorer retry
 
     # --- Rate-limit throttling -----------------------------------------
     # Seconds between successive LLM calls. Gemini free tier is about
@@ -190,3 +190,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+

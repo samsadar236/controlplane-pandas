@@ -59,7 +59,17 @@ def _invoke(system: str, user_content: list[dict] | str, role: str = "text") -> 
     llm = get_llm(role)
     msgs = [SystemMessage(content=system), HumanMessage(content=user_content)]
     response = llm.invoke(msgs)
-    return response.content if isinstance(response.content, str) else str(response.content)
+    raw = response.content
+    if isinstance(raw, str):
+        content = raw
+    elif isinstance(raw, list):
+        content = "".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in raw
+        )
+    else:
+        content = str(raw)
+    return content
 
 
 # ===========================================================================
